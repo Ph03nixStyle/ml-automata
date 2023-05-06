@@ -1,1 +1,4 @@
 TP3/
+*.cmi
+*.cmo
+a.out

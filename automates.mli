@@ -1,5 +1,11 @@
+
+(*Représente un mot lu par un automate*)
 type 'a mot = 'a list
+
+(*Represents an automata state*)
 type etat = int
+
+(*Représente un automate: delta est la fonction de transition, i et f les états initiaux et finaux, nb le nombre d'états, sigma l'alphabet.*)
 type 'a automate = {
   nb : etat;
   sigma : 'a array;
@@ -7,7 +13,6 @@ type 'a automate = {
   f : etat mot;
   delta : (etat * 'a, etat mot) Hashtbl.t;
 }
-
 
 (**Affiche les différentes composantes et transitions de l'automate d'entrée à l'aide de la fonction d'affichage donne en entrée.*)
 val affiche_automate : 'a automate -> ('a -> unit) -> unit

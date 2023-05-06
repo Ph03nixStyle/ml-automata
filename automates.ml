@@ -228,8 +228,6 @@ On construit maintenant les états finaux:
 On renvoie l'automate finalement construit.
 *)
 
-
-
 let determinise_non_renomme (a: 'a automate) : 'a automate =
   if est_deterministe a then a else (*On vérifie avant tout que ce soit bien nécessaire de déterminiser, c'est moins couteux*)
   let n, taille_sigma = a.nb, Array.length a.sigma in
@@ -245,7 +243,7 @@ let determinise_non_renomme (a: 'a automate) : 'a automate =
   let rec process (pile: ensemble list) =
     match pile with
     | [] -> ()
-    | etat::tail -> 
+    | etat::tail -> (
       let nb_etat = ensemble_vers_entier etat in
       if est_etat_final etat then etat_finaux := etat::!etat_finaux;
       let nouveaux_voisins = ref [] in
@@ -264,16 +262,17 @@ let determinise_non_renomme (a: 'a automate) : 'a automate =
         )
       done;
       process (!nouveaux_voisins @ tail)
-    in process [i'];
+    )
+  in process [i'];
 
-    (*On renvoie finalement l'automate*)
-    {
-      nb = puissance 2 n; (*Exponentiel en |états| en espace -> on le réduit juste après.*)
-      sigma = a.sigma;
-      i = [ensemble_vers_entier i'];
-      f = List.map (fun etat -> ensemble_vers_entier etat) !etat_finaux;
-      delta = delta'
-    }
+  (*On renvoie finalement l'automate*)
+  {
+    nb = puissance 2 n; (*Exponentiel en |états| en espace -> on le réduit juste après.*)
+    sigma = a.sigma;
+    i = [ensemble_vers_entier i'];
+    f = List.map (fun etat -> ensemble_vers_entier etat) !etat_finaux;
+    delta = delta'
+  }
 ;;
 
 
@@ -326,11 +325,10 @@ let etats_prod (e1: etat list) (e2: etat list) (n1: int) : etat list =
 (*Calcule l'automate intersection de a1 et a2. Prérequis: mêmes alphabets.*)
 let intersection_automates_non_renomme (a1: 'a automate) (a2: 'a automate) =
   if a1.nb = 0 then a2 else if a2.nb = 0 then a1 else
-  
   let taille_sigma = Array.length a1.sigma in
   let vus = Array.make (a1.nb * a2.nb) false in (*tableau des états du produit déjà créés/visités*)
-  let idx x1 x2 = x1*a1.nb + x2 in (*fonction pour trouver l'indice d'un état du produit*)
-  let idx' x = (x / a1.nb, x mod a1.nb) in (*fonction pour retrouver les états initiaux correspondant à l'état produit x*)
+  let idx x1 x2 = x1*a2.nb + x2 in (*fonction pour trouver l'indice d'un état du produit*)
+  let idx' x = (x / a2.nb, x mod a2.nb) in (*fonction pour retrouver les états initiaux correspondant à l'état produit x*)
   let etats_init = etats_prod a1.i a2.i a1.nb in
   let etats_finaux = etats_prod a1.f a2.f a1.nb in
   let delta = Hashtbl.create a1.nb in (*transitions du produit*)
@@ -338,13 +336,13 @@ let intersection_automates_non_renomme (a1: 'a automate) (a2: 'a automate) =
   (*Construction des transitions*)
   List.iter (fun x -> vus.(x) <- true) etats_init;
   List.iter (fun x -> vus.(x) <- true) etats_finaux;
+
   let rec process (pile: etat list) =
     match pile with
     | [] -> ()
-    | x::tail -> 
+    | x::tail -> (
       let nouveaux_voisins = ref [] in
       let (x1, x2) = idx' x in
-
       for i = 0 to taille_sigma - 1 do
         let lettre = a1.sigma.(i) in
         (*Lecture de la lettre courante `i` depuis le super-état `etat`*)
@@ -358,6 +356,7 @@ let intersection_automates_non_renomme (a1: 'a automate) (a2: 'a automate) =
               let c = idx a b in
               a_ajouter := c::!a_ajouter;
               if not vus.(c) then (
+                let _ = Printf.printf "nouveau voisin: %d (%d, %d)\n" c a b in
                 nouveaux_voisins := c::!nouveaux_voisins;
                 vus.(c) <- true;
               )
@@ -368,19 +367,19 @@ let intersection_automates_non_renomme (a1: 'a automate) (a2: 'a automate) =
           List.iter (fun a -> ajouter_transition_delta delta x lettre a) !a_ajouter;
         );
       done;
-      
       process (!nouveaux_voisins @ tail)
-    in process etats_init;
+    )
+  in process etats_init;
     
-    (*On renvoie finalement l'automate*)
-    {
-      nb = a1.nb * a2.nb; (*Exponentiel en |états| en espace -> on le réduit juste après.*)
-      sigma = a1.sigma;
-      i = etats_init;
-      f = etats_finaux;
-      delta = delta
-      }
-    ;;
+  (*On renvoie finalement l'automate*)
+  {
+    nb = a1.nb * a2.nb; (*Exponentiel en |états| en espace -> on le réduit juste après.*)
+    sigma = a1.sigma;
+    i = etats_init;
+    f = etats_finaux;
+    delta = delta
+    }
+;;
     
     
     let intersection_automates a1 a2 = renomme (intersection_automates_non_renomme a1 a2);;
@@ -503,11 +502,11 @@ let tests () =
 
   (*TEST INTERSECTION*)
   print_endline "Automate a2 ---------------------------";
-  affiche_automate_char a3;
+  affiche_automate_char a2;
   print_endline "Automate a3 ---------------------------";
   affiche_automate_char a3;
   print_endline "Automate intersection de a2 et a3 ---------------------------";
-  affiche_automate_char (intersection_automates a2 a3);
+  affiche_automate_char (intersection_automates a3 a2);
 ;;
 
 tests ();;
