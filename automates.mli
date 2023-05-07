@@ -1,43 +1,46 @@
 
-(*Représente un mot lu par un automate*)
-type 'a mot = 'a list
+(** Représente un mot lu par un automate*)
+type 'a mot_t = 'a list
 
-(*Represents an automata state*)
-type etat = int
+(** Représente un état d'automate (un entier)*)
+type etat_t = int
 
-(*Représente un automate: delta est la fonction de transition, i et f les états initiaux et finaux, nb le nombre d'états, sigma l'alphabet.*)
-type 'a automate = {
-  nb : etat;
+(** Représente un automate: delta est la fonction de transition, i et f les états initiaux et finaux, nb le nombre d'états, sigma l'alphabet.*)
+type 'a t = {
+  nb : etat_t;
   sigma : 'a array;
-  i : etat mot;
-  f : etat mot;
-  delta : (etat * 'a, etat mot) Hashtbl.t;
+  i : etat_t list;
+  f : etat_t list;
+  delta : (etat_t * 'a, etat_t list) Hashtbl.t;
 }
 
-(**Affiche les différentes composantes et transitions de l'automate d'entrée à l'aide de la fonction d'affichage donne en entrée.*)
-val affiche_automate : 'a automate -> ('a -> unit) -> unit
+(** [affiche a printer] Affiche les différentes composantes et transitions de l'automate d'entrée à l'aide de la fonction d'affichage [printer].*)
+val affiche : 'a t -> ('a -> unit) -> unit
 
-(**Affiche un automate ayant un alphabet de caractères en terminal*)
-val affiche_automate_char : char automate -> unit
+(** [affiche_char a] Affiche en termuinal un automate ayant un alphabet de type [char]*)
+val affiche_char : char t -> unit
 
-(** Ramène les états de l'automate sur un intervalle en enlevant les états vides*)
-val renomme : 'a automate -> 'a automate
+(** [renomme a] Ramène les états de l'automate sur un intervalle en enlevant les états vides*)
+val renomme : 'a t -> 'a t
 
-(**Renvoie un nouvel automate ayant la transition (q, a, q') ajoutée*)
-val ajouter_transition : 'a automate -> etat -> 'a -> etat -> unit
+(** [ajoute_transition a q1 letter q2] Ajoute la transition [(q1, lettre) -> q2] à l'automate [a]*)
+val ajouter_transition : 'a t -> etat_t -> 'a -> etat_t -> unit
 
-(**Renvoie true ou false selon si l'automate est déterministe ou non, i.e si max. 1 état initial et
-    max 1 état d'arrivée dans les transitions par couple (état, lettre)*)
-val est_deterministe : 'a automate -> bool
+(** [est_deterministe a] Renvoie true si l'automate [a] est déterministe, i.e si il y a au plus 1 état initial et
+    au plus 1 état d'arrivée dans les transitions par couple [(etat, lettre)], et faux sinon.*)
+val est_deterministe : 'a t -> bool
 
-(**Renvoie true ou false selon si l'automate accepte le mot donné*)
-val accepte_mot : 'a automate -> 'a mot -> bool
+(** [accepte_mot a w] Renvoie true si [a] accepte [w], faux sinon.*)
+val accepte_mot : 'a t -> 'a mot_t -> bool
 
-(**Renvoie une version déterministe de l'automate d'entrée*)
-val determinise : 'a automate -> 'a automate
+(** [determinise a] Renvoie une version déterministe de l'automate [a].*)
+val determinise : 'a t -> 'a t
 
-(**Renvoie un automate représentant l'union des 2 automates d'entrée*)
-val union_automates : 'a automate -> 'a automate -> 'a automate
+(** [union a1 a2] Renvoie un automate représentant l'union de [a1] et [a2]*)
+val union_automates : 'a t -> 'a t -> 'a t
 
-(**Renvoie un automate représentant l'intersection des 2 automates d'entrée*)
-val intersection_automates : 'a automate -> 'a automate -> 'a automate
+(** [intersection a1 a2] Renvoie un automate représentant l'union de [a1] et [a2]*)
+val intersection : 'a t -> 'a t -> 'a t
+
+(** [concatenation a1 a2] Renvoie un automate représentant l'union de [a1] et [a2]*)
+val concatenation : 'a t -> 'a t -> 'a t
