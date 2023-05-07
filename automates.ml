@@ -390,11 +390,42 @@ let intersection a1 a2 = renomme (intersection_non_renomme a1 a2);;
 let concatenation (a1: 'a t)  (a2: 'a t) : 'a t =
   (*TODO*)
   (*Mise en place:
-  - On prend tous les *)
-  
+  - Créer les nouveaux états de a, qui a une taille |a1| + |a2| ??????
+  -Renomme tous les états de 
+  - On prend tous les états finaux.
+  Pour tout f dans F1:
+    Pour tout i dans I2:
+      Crée la transition "(f, epsilon) -> i") (pas vraiment, en fait on veut direct la supprimer)
+      Si "(i, a) -> q" existe dans a2, alors on crée (f, a) -> q dans l'automate a
+      Si i est final, alors f est final
+  *)
   let taille_sigma = Array.length a1.sigma in
-  
-  a1
+  let idx_a2_vers_a q = a1.nb + q in
+  let idx_a_vers_a2 q = a1.nb - q in
+  let nb = a1.nb + a2.nb in
+  let etats_init = a1.i in
+  let etats_finaux = ref (List.map idx_a2_vers_a a2.f) in (*Etats finaux de a2 où on convertis leurs indices, en référence parce qu'on va possiblement en rajouter*)
+
+  let delta = Hashtbl.copy a1.delta in
+  Hashtbl.iter (fun (etat, lettre) liste_etats -> (*Ajout de toutes les transitions de a2.delta à delta*)
+    Hashtbl.add delta (idx_a2_vers_a etat, lettre) (List.map idx_a2_vers_a liste_etats)
+  ) a2.delta;
+
+
+  (* List.iter (fun f ->
+    List.iter (fun i ->
+      
+    ) a2.i
+  ) a1.f; *)
+
+
+  {
+    nb = nb;
+    sigma = a1.sigma;
+    i = etats_init;
+    f = !etats_finaux;
+    delta = delta;
+  }
 ;;
 
 
