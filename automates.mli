@@ -23,8 +23,11 @@ val affiche_char : char t -> unit
 (** [renomme a] Ramène les états de l'automate sur un intervalle en enlevant les états vides*)
 val renomme : 'a t -> 'a t
 
-(** [ajoute_transition a q1 letter q2] Ajoute la transition [(q1, lettre) -> q2] à l'automate [a]*)
+(** [ajoute_transition a q1 lettre q2] Ajoute la transition [(q1, lettre) -> q2] à l'automate [a]*)
 val ajouter_transition : 'a t -> etat_t -> 'a -> etat_t -> unit
+
+(** [retirer_trnsition a q1 lettre q2] Retire la transition [(q1, lettre) -> q2] à l'automate [a]. Raise Not_found si elle n'existe pas.*)
+val retirer_transition : 'a t -> etat_t -> 'a -> etat_t -> unit
 
 (** [est_deterministe a] Renvoie true si l'automate [a] est déterministe, i.e si il y a au plus 1 état initial et
     au plus 1 état d'arrivée dans les transitions par couple [(etat, lettre)], et faux sinon.*)

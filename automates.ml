@@ -27,6 +27,29 @@ let ajouter_transition (a: 'a t) (q1: etat_t) (lettre: 'a) (q2: etat_t) : unit =
 ;;
 
 
+let retirer_transition_delta delta q1 lettre q2 : unit =
+  let rec retirer_elt_liste l elt =
+    match l with
+    | [] -> raise Not_found
+    | h::t -> if h = elt then t else retirer_elt_liste t elt
+  in
+
+  match Hashtbl.find_opt delta (q1,lettre) with
+  | None -> raise Not_found
+  | Some(l) -> (
+    let new_l = retirer_elt_liste l q2 in
+    if new_l = []
+    then Hashtbl.remove delta (q1, lettre)
+    else Hashtbl.replace delta (q1, lettre) new_l
+  )
+;;
+
+
+let retirer_transition (a: 'a t) (q1: etat_t) (lettre: 'a) (q2: etat_t) : unit =
+  retirer_transition_delta a.delta q1 lettre q2
+;;
+
+
 let affiche_transitions (a : 'a t) (print_lettre : 'a -> unit) : unit =
   for i = 0 to a.nb - 1 do
     Printf.printf "Etat %i: \n" i;
@@ -43,6 +66,7 @@ let affiche_transitions (a : 'a t) (print_lettre : 'a -> unit) : unit =
     print_newline ()
     done
   done
+;;
 
 let affiche (a: 'a t) (print_lettre: 'a -> unit) : unit =
   Printf.printf "Nombre d'états: %d\n" a.nb;
@@ -54,15 +78,15 @@ let affiche (a: 'a t) (print_lettre: 'a -> unit) : unit =
   print_newline ();
   affiche_transitions a print_lettre;
   print_newline ()
+;;
 
-let affiche_char (a : 'a t) : unit =
-  affiche a print_char
+
+let affiche_char (a : 'a t) : unit = affiche a print_char;;
 
 (* O(|I| + |delta|) *)
 let est_deterministe (a: 'a t) : bool =
-  (*Vérifie que chaque valeur de chaque lettre pour chaque état (donc, chaque entrée de a.delta) a max. 1 état associé*)
-  (*et qu'on a max 1 état entrant*)
-  if List.length a.i > 1 then false
+  if List.length a.i > 1 
+  then false
   else Hashtbl.fold (fun _key value acc -> (List.length value <= 1) && acc) a.delta true
 ;;
 
@@ -76,16 +100,20 @@ let vide (n: int) : ensemble = Array.make n false;;
 let est_vide (p: ensemble) : bool = not (Array.exists (fun x -> x = true) p);;
 (*Alloue un nouveau tableau pour l'intersection*)
 let intersection_parties (p1: ensemble) (p2: ensemble) : ensemble = Array.map2 (fun e1 e2 -> e1 && e2) p1 p2;;
+(*Alloue un nouveau tableau pour l'union*)
+let union_parties (p1: ensemble) (p2: ensemble) : ensemble = Array.map2 (fun e1 e2 -> e1 || e2) p1 p2;;
+
+let partie_vers_liste (p: ensemble) = fst (Array.fold_left (fun (acc, i) x -> if x then (i::acc, i+1) else (acc, i+1)) ([], 0) p);;
 
 (*Ajoute les elts de p2 à p1*)
-let ajoute (p1: ensemble) (p2: ensemble) : unit = 
+let ajoute_partie (p1: ensemble) (p2: ensemble) : unit = 
   for i = 0 to (Array.length p1) - 1 do
       p1.(i) <- p1.(i) || p2.(i)
   done
 ;;
 
 (*Construit un tableau de taille n contenant les elements de la liste l*)
-let construit (l: int list) (n: int) : ensemble =
+let construit_partie (l: int list) (n: int) : ensemble =
   let a: ensemble = vide n in
   List.iter (fun elt -> a.(elt) <- true) l;
   a
@@ -95,14 +123,14 @@ let construit (l: int list) (n: int) : ensemble =
 let lire_lettre_etat (a: 'a t) (q: etat_t) (b: 'a) : ensemble =
   match Hashtbl.find_opt a.delta (q, b) with
   | None -> vide a.nb
-  | Some(p) -> construit p a.nb
+  | Some(p) -> construit_partie p a.nb
 ;;
 
 (*Renvoie l'ensemble des états atteint en lisant la lettre b depuis les états de p*)
 let lire_lettre_partie (a: 'a t) (p: ensemble) (b: 'a) : ensemble =
   (*On fait l'union des lire_lettre_etat sur chaque état de la partie p*)
   let acc = vide a.nb in
-  Array.iteri (fun i elt -> if elt then ajoute acc (lire_lettre_etat a i b)) p;
+  Array.iteri (fun i elt -> if elt then ajoute_partie acc (lire_lettre_etat a i b)) p;
   acc
 ;;
 
@@ -119,8 +147,8 @@ let rec lire_mot (a: 'a t) (p: ensemble)  (u: 'a mot_t) : ensemble =
 
 let accepte_mot a u =
   (*Vérifie que l'intersection entre les états atteints en lisant u depuis les états initiaux de l'automate, et les états acceptants, est non-vide.*)
-  let etats_finaux = lire_mot a (construit a.i a.nb) u in
-  let etats_acceptants = construit a.f a.nb in
+  let etats_finaux = lire_mot a (construit_partie a.i a.nb) u in
+  let etats_acceptants = construit_partie a.f a.nb in
   not (est_vide (intersection_parties etats_finaux etats_acceptants))
 ;;
 
@@ -225,19 +253,17 @@ On construit maintenant les états finaux:
 	Pour chaque super-état construit dans A':
 		s'il existe un état de A qui était final dans ce super-état de A',
 		alors on marque ce super-état comme final dans A'.
-On renvoie l'automate finalement construit.
-*)
-
+On renvoie l'automate finalement construit.*)
 let determinise_non_renomme (a: 'a t) : 'a t =
   if est_deterministe a then a else (*On vérifie avant tout que ce soit bien nécessaire de déterminiser, c'est moins couteux*)
   let n, taille_sigma = a.nb, Array.length a.sigma in
   let vus = Array.make (puissance 2 n) false in (*tableau des super-états déjà créés/visités*)
-  let est_etat_final = est_non_disjoint (construit a.f n) in (*application partielle: renvoie si un état contient un état final*)
+  let est_etat_final = est_non_disjoint (construit_partie a.f n) in (*application partielle: renvoie si un état contient un état final*)
   
   (*Construction a'*)
   let etat_finaux = ref [] in
   let delta': (etat_t * 'a, etat_t list) Hashtbl.t = Hashtbl.create (n * n) in (*transitions du déterminisé*)
-  let i' = construit a.i n in
+  let i' = construit_partie a.i n in
   vus.(ensemble_vers_entier i') <- true;
 
   let rec process (pile: ensemble list) =
@@ -288,10 +314,9 @@ let union (a1: 'a t) (a2: 'a t) =
     | [] -> List.rev acc
     | h::t -> rajoute_n_liste t ((h + a1.nb)::acc) in
 
-
-  let delta = Hashtbl.create (Hashtbl.length a1.delta + Hashtbl.length a2.delta) in
-  
+    
   (*Ajoute les transitions de a1 et a2 à delta*)
+  let delta = Hashtbl.create (Hashtbl.length a1.delta + Hashtbl.length a2.delta) in
   Hashtbl.iter (fun (etat_depart, lettre) lst_etats ->
     Hashtbl.add delta (etat_depart, lettre) lst_etats
   ) a1.delta;
@@ -310,8 +335,7 @@ let union (a1: 'a t) (a2: 'a t) =
 ;;
 
 
-
-(*Construit le produit cartésien (en renommant les états pour que ce soient des ints) en partant de 2 lises d'états. n1 est le nb total d'états du 1er automate.*)
+(*Construit le produit cartésien (en renommant les états pour que ce soient des ints) en partant de 2 listes d'états. n1 est le nb total d'états du 1er automate.*)
 let etats_prod (e1: etat_t list) (e2: etat_t list) (n1: int) : etat_t list =
   let rec aux (x: etat_t) (acc: etat_t list) (e1: etat_t list) : etat_t list =
     match e1 with
@@ -327,8 +351,8 @@ let intersection_non_renomme (a1: 'a t) (a2: 'a t) =
   if a1.nb = 0 then a2 else if a2.nb = 0 then a1 else
   let taille_sigma = Array.length a1.sigma in
   let vus = Array.make (a1.nb * a2.nb) false in (*tableau des états du produit déjà créés/visités*)
-  let idx x1 x2 = x1*a2.nb + x2 in (*fonction pour trouver l'indice d'un état du produit*)
-  let idx' x = (x / a2.nb, x mod a2.nb) in (*fonction pour retrouver les états initiaux correspondant à l'état produit x*)
+  let idx_vers_a x1 x2 = x1*a2.nb + x2 in (*fonction pour trouver l'indice d'un état du produit*)
+  let idx_depuis_a x = (x / a2.nb, x mod a2.nb) in (*fonction pour retrouver les états initiaux correspondant à l'état produit x*)
   let etats_init = etats_prod a1.i a2.i a1.nb in
   let etats_finaux = etats_prod a1.f a2.f a1.nb in
   let delta = Hashtbl.create a1.nb in (*transitions du produit*)
@@ -342,7 +366,7 @@ let intersection_non_renomme (a1: 'a t) (a2: 'a t) =
     | [] -> ()
     | x::tail -> (
       let nouveaux_voisins = ref [] in
-      let (x1, x2) = idx' x in
+      let (x1, x2) = idx_depuis_a x in
       for i = 0 to taille_sigma - 1 do
         let lettre = a1.sigma.(i) in
         (*Lecture de la lettre courante `i` depuis le super-état `etat`*)
@@ -353,7 +377,7 @@ let intersection_non_renomme (a1: 'a t) (a2: 'a t) =
           let a_ajouter = ref [] in
           List.iter (fun a ->
             List.iter (fun b ->
-              let c = idx a b in
+              let c = idx_vers_a a b in
               a_ajouter := c::!a_ajouter;
               if not vus.(c) then (
                 let _ = Printf.printf "nouveau voisin: %d (%d, %d)\n" c a b in
@@ -385,45 +409,57 @@ let intersection_non_renomme (a1: 'a t) (a2: 'a t) =
 let intersection a1 a2 = renomme (intersection_non_renomme a1 a2);;
     
 
-
-(*Renvoie l'automate intersection de a1 et a2*)
+(*Renvoie l'automate concaténé de a1 et a2*)
 let concatenation (a1: 'a t)  (a2: 'a t) : 'a t =
-  (*TODO*)
-  (*Mise en place:
-  - Créer les nouveaux états de a, qui a une taille |a1| + |a2| ??????
-  -Renomme tous les états de 
-  - On prend tous les états finaux.
-  Pour tout f dans F1:
-    Pour tout i dans I2:
-      Crée la transition "(f, epsilon) -> i") (pas vraiment, en fait on veut direct la supprimer)
-      Si "(i, a) -> q" existe dans a2, alors on crée (f, a) -> q dans l'automate a
-      Si i est final, alors f est final
-  *)
   let taille_sigma = Array.length a1.sigma in
   let idx_a2_vers_a q = a1.nb + q in
-  let idx_a_vers_a2 q = a1.nb - q in
   let nb = a1.nb + a2.nb in
-  let etats_init = a1.i in
-  let etats_finaux = ref (List.map idx_a2_vers_a a2.f) in (*Etats finaux de a2 où on convertis leurs indices, en référence parce qu'on va possiblement en rajouter*)
 
+  (*Création d'ensembles pour ces listes, utile car on a besoin de faire des intersections/unions.*)
+  let init_a1   : ensemble = Array.make nb false in 
+  let init_a2   : ensemble = Array.make nb false in 
+  let finaux_a1 : ensemble = Array.make nb false in 
+  let finaux_a2 : ensemble = Array.make nb false in 
+  List.iter (fun x -> init_a1.(x) <- true) a1.i;
+  List.iter (fun x -> finaux_a1.(x) <- true) a1.f;
+  List.iter (fun x -> init_a2.(idx_a2_vers_a x) <- true) a2.i;
+  List.iter (fun x -> finaux_a2.(idx_a2_vers_a x) <- true) a2.f;
+
+  (*Ensuite on ajoute des états finaux/initiaux si besoin :
+  - Si l'intersection entre a1.f et a1.i est non-nulle alors tous les a2.i deviennent finaux dans a
+  - Si l'intersection entre a2.f et a2.i est non-nulle alors tous les a1.f deviennent finaux dans a*)
+  let etats_init =
+    let partie_init = if est_non_disjoint init_a1 finaux_a1 then union_parties init_a1 init_a2 else init_a1 in
+    partie_vers_liste partie_init
+  in
+  let etats_finaux =
+    let partie_finaux = if est_non_disjoint init_a2 finaux_a2 then union_parties finaux_a1 finaux_a2 else finaux_a2 in
+    partie_vers_liste partie_finaux
+  in
+
+  (*Pour les transitions: d'abord on copie les transitions des 2 dans une seule Hashtbl.*)
   let delta = Hashtbl.copy a1.delta in
   Hashtbl.iter (fun (etat, lettre) liste_etats -> (*Ajout de toutes les transitions de a2.delta à delta*)
     Hashtbl.add delta (idx_a2_vers_a etat, lettre) (List.map idx_a2_vers_a liste_etats)
   ) a2.delta;
-
-
-  (* List.iter (fun f ->
-    List.iter (fun i ->
-      
+  
+  (*Ensuite on fait le lien entre les 2 automates.*)
+  List.iter (fun etatf ->
+    List.iter (fun etati ->
+      for k = 0 to taille_sigma - 1 do
+        let lettre = a1.sigma.(k) in
+        match Hashtbl.find_opt a2.delta (etati, lettre) with
+        | None -> ()
+        | Some(liste_etats) -> Hashtbl.add delta (etatf, lettre) (List.map idx_a2_vers_a liste_etats)
+      done
     ) a2.i
-  ) a1.f; *)
-
+  ) a1.f;
 
   {
     nb = nb;
     sigma = a1.sigma;
     i = etats_init;
-    f = !etats_finaux;
+    f = etats_finaux;
     delta = delta;
   }
 ;;
@@ -454,7 +490,6 @@ let tests () =
   ajouter_transition a0 4 'b' 5;
   ajouter_transition a0 5 'a' 5;
   ajouter_transition a0 5 'b' 1;
-  assert (est_deterministe a0);
 
   (*Deuxième automate test*)
   let (a1: char t) = {
@@ -474,7 +509,6 @@ let tests () =
   ajouter_transition a1 2 'b' 3;
   ajouter_transition a1 3 'b' 1;
   ajouter_transition a1 3 'b' 2;
-  assert (not (est_deterministe a1));
 
   (*Automate reconnaissant les mots ayant un a en dernière position*)
   let (a2: char t) = { 
@@ -487,7 +521,6 @@ let tests () =
   ajouter_transition a2 0 'a' 0;
   ajouter_transition a2 0 'b' 0;
   ajouter_transition a2 0 'a' 1;
-  assert (not (est_deterministe a2));
 
   (*Automate reconnaissant les mots ayant un a en n-3ème position*)
   let (a3: char t) = {
@@ -504,28 +537,37 @@ let tests () =
   ajouter_transition a3 1 'b' 2;
   ajouter_transition a3 2 'a' 3;
   ajouter_transition a3 2 'b' 3;
-  assert(not (est_deterministe a3));
 
-  assert(ensemble_vers_entier [|false; false; true|] = 1);
-  assert(ensemble_vers_entier [|true; false; false|] = 4);
-  assert(ensemble_vers_entier [|true; false; true|] = 5);
-  assert(ensemble_vers_entier [|true; true; true|] = 7);
+  assert (ensemble_vers_entier [|false; false; true|] = 1);
+  assert (ensemble_vers_entier [|true; false; false|] = 4);
+  assert (ensemble_vers_entier [|true; false; true|] = 5);
+  assert (ensemble_vers_entier [|true; true; true|] = 7);
 
-  assert(entier_vers_ensemble 1 3 = [|false; false; true|]);
-  assert(entier_vers_ensemble 4 3 = [|true; false; false|]);
-  assert(entier_vers_ensemble 5 3 = [|true; false; true|]);
-  assert(entier_vers_ensemble 7 3 = [|true; true; true|]);
+  assert (entier_vers_ensemble 1 3 = [|false; false; true|]);
+  assert (entier_vers_ensemble 4 3 = [|true; false; false|]);
+  assert (entier_vers_ensemble 5 3 = [|true; false; true|]);
+  assert (entier_vers_ensemble 7 3 = [|true; true; true|]);
 
-  assert(puissance 2 0 = 1);
-  assert(puissance 2 1 = 2);
-  assert(puissance 2 2 = 4);
-  assert(puissance 2 3 = 8);
-  assert(puissance 2 4 = 16);
+  assert (puissance 2 0 = 1);
+  assert (puissance 2 1 = 2);
+  assert (puissance 2 2 = 4);
+  assert (puissance 2 3 = 8);
+  assert (puissance 2 4 = 16);
 
-  assert(est_deterministe (determinise a0));
-  assert(est_deterministe (determinise a1));  
-  assert(est_deterministe (determinise a2));
-  assert(est_deterministe (determinise a3));
+  assert (partie_vers_liste [|true; true; true; true|] = [3; 2; 1; 0]);
+  assert (partie_vers_liste [|false; false; false; false|] = []);
+  assert (partie_vers_liste [|true; false; false; false|] = [0]);
+  assert (partie_vers_liste [|false; false; true; true|] = [3; 2]);
+
+  assert (est_deterministe a0);
+  assert (not (est_deterministe a1));
+  assert (not (est_deterministe a2));
+  assert (not (est_deterministe a3));
+
+  assert (est_deterministe (determinise a0));
+  assert (est_deterministe (determinise a1));  
+  assert (est_deterministe (determinise a2));
+  assert (est_deterministe (determinise a3));
 
 
   (*TEST DETERMINISE*)
@@ -548,12 +590,21 @@ let tests () =
 
 
   (*TEST INTERSECTION*)
-  print_endline "Automate a2 ---------------------------";
+  (* print_endline "Automate a2 ---------------------------";
   affiche_char a2;
   print_endline "Automate a3 ---------------------------";
   affiche_char a3;
-  print_endline "Automate intersection de a2 et a3 ---------------------------";
-  affiche_char (intersection a3 a2);
+  print_endline "Automate intersection de a2 et a3 ---------------------------"; (*a2: A*a, a3: A*aAA, donc a2 inter a3: A* aAa*)
+  affiche_char (intersection a2 a3);  *)
+
+  (*TEST CONCATENATION*)
+  (* print_endline "Automate a2 ---------------------------";
+  affiche_char a2;
+  print_endline "Automate a3 ---------------------------";
+  affiche_char a3;
+  print_endline "Automate concaténation de a2 et a3 ---------------------------";
+  affiche_char (concatenation a2 a3) *)
+
 ;;
 
 tests ();;
