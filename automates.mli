@@ -40,7 +40,7 @@ val accepte_mot : 'a t -> 'a mot_t -> bool
 val determinise : 'a t -> 'a t
 
 (** [union a1 a2] Renvoie un automate représentant l'union de [a1] et [a2]*)
-val union_automates : 'a t -> 'a t -> 'a t
+val union : 'a t -> 'a t -> 'a t
 
 (** [intersection a1 a2] Renvoie un automate représentant l'union de [a1] et [a2]*)
 val intersection : 'a t -> 'a t -> 'a t
